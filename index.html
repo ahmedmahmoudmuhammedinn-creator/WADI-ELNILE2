@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -763,7 +764,7 @@
             setTimeout(() => { if (toast.parentElement) toast.remove(); }, delay);
         };
 
-        const openModal = (htmlContent, size = 'md') => {
+        window.openModal = (htmlContent, size = 'md') => {
             const modal = document.getElementById('modal-container');
             const content = document.getElementById('modal-content');
             
@@ -784,7 +785,7 @@
             }
         });
 
-        const closeModal = () => {
+        window.closeModal = () => {
             document.getElementById('modal-container').classList.add('hidden');
         };
 
@@ -814,7 +815,7 @@
             showToast(p.status === 'active' ? 'تم تفعيل المشروع' : 'تم أرشفة المشروع');
         };
 
-        const showSection = (sectionName, projectId = null) => {
+        window.showSection = (sectionName, projectId = null) => {
             if (!canAccess(sectionName, projectId)) {
                 showToast('غير مسموح لك بالوصول لهذا القسم', 'error');
                 return;
@@ -917,21 +918,23 @@
             const stats = calculateGlobalStats();
             container.innerHTML = `
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <div class="stat-card income">
-                        <p class="stat-label">إجمالي الإيرادات</p>
-                        <p class="stat-value">${formatMoney(stats.totalIn)}</p>
+                    <div class="stat-card income bg-gradient-to-br from-white to-emerald-50/50 shadow-sm border-t-emerald-500 relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 w-12 h-12 bg-emerald-100/30 rounded-full"></div>
+                        <p class="stat-label flex items-center gap-1.5"><i data-lucide="trending-up" class="w-3.5 h-3.5"></i> إجمالي الإيرادات</p>
+                        <p class="stat-value !text-3xl !font-black !text-emerald-700 font-mono tracking-tight">${formatMoney(stats.totalIn)}</p>
                     </div>
-                    <div class="stat-card expense">
-                        <p class="stat-label">إجمالي المصروفات</p>
-                        <p class="stat-value">${formatMoney(stats.totalOut)}</p>
+                    <div class="stat-card expense bg-gradient-to-br from-white to-rose-50/50 shadow-sm border-t-rose-500 relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 w-12 h-12 bg-rose-100/30 rounded-full"></div>
+                        <p class="stat-label flex items-center gap-1.5"><i data-lucide="trending-down" class="w-3.5 h-3.5"></i> إجمالي المصروفات</p>
+                        <p class="stat-value !text-3xl !font-black !text-rose-700 font-mono tracking-tight">${formatMoney(stats.totalOut)}</p>
                     </div>
-                    <div class="stat-card profit">
-                        <p class="stat-label">صافي الربح الكلي</p>
-                        <p class="stat-value ${stats.net >= 0 ? '!text-green-600' : '!text-red-600'}">${formatMoney(stats.net)}</p>
+                    <div class="stat-card profit bg-white hover:bg-blue-50/20 transition shadow-sm border-t-blue-500">
+                        <p class="stat-label flex items-center gap-1.5 text-blue-600/70"><i data-lucide="calculator" class="w-3.5 h-3.5"></i> صافي الربح الكلي</p>
+                        <p class="stat-value !text-2xl !font-black ${stats.net >= 0 ? '!text-blue-700' : '!text-red-700'} font-mono">${formatMoney(stats.net)}</p>
                     </div>
-                    <div class="stat-card cash">
-                        <p class="stat-label">الرصيد النقدي الحالي</p>
-                        <p class="stat-value">${formatMoney(stats.net)}</p>
+                    <div class="stat-card cash bg-white hover:bg-amber-50/20 transition shadow-sm border-t-amber-500">
+                        <p class="stat-label flex items-center gap-1.5 text-amber-600/70"><i data-lucide="wallet" class="w-3.5 h-3.5"></i> الرصيد النقدي الحالي</p>
+                        <p class="stat-value !text-2xl !font-black !text-amber-700 font-mono">${formatMoney(stats.net)}</p>
                     </div>
                 </div>
 
@@ -949,6 +952,7 @@
                                         <th>المشروع</th>
                                         <th>المبلغ</th>
                                         <th>الحالة</th>
+                                        <th class="no-print">أوامر</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -957,12 +961,18 @@
                                         return `
                                             <tr>
                                                 <td>${formatDate(t.date)}</td>
-                                                <td class="font-semibold">${p.name}</td>
-                                                <td class="font-bold">${formatMoney(t.amount, t.projectId)}</td>
+                                                <td class="font-semibold text-xs truncate max-w-[150px]" title="${p.name}">${p.name}</td>
+                                                <td class="font-bold text-xs">${formatMoney(t.amount, t.projectId)}</td>
                                                 <td>
-                                                    <span class="badge ${t.type === 'in' ? 'badge-success' : 'badge-danger'}">
+                                                    <span class="badge ${t.type === 'in' ? 'badge-success' : 'badge-danger'} !text-[10px] !py-0.5">
                                                         ${t.type === 'in' ? 'إيراد' : 'مصروف'}
                                                     </span>
+                                                </td>
+                                                <td class="no-print">
+                                                    <div class="flex items-center gap-1">
+                                                        <button onclick="openAddTransactionModal('${t.projectId}', '${t.id}')" class="p-1 text-blue-400 hover:text-blue-600 transition hover:bg-blue-50 rounded-md" title="تعديل"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
+                                                        <button onclick="deleteTransaction('${t.id}', '${t.projectId}')" class="p-1 text-gray-300 hover:text-red-500 transition hover:bg-red-50 rounded-md" title="حذف"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         `;
@@ -983,6 +993,7 @@
                 </div>
             `;
             initDashboardCharts();
+            if (window.lucide) window.lucide.createIcons();
         };
 
         let currentProjectTab = 'summary';
@@ -1039,6 +1050,7 @@
             const project = state.projects.find(p => p.id === pid);
             const progressPercent = project.budget ? Math.min(100, (stats.totalOut / project.budget) * 100) : 0;
             const revenueProgress = project.contractValue ? Math.min(100, (stats.totalIn / project.contractValue) * 100) : 0;
+            const share = project.investorShare !== undefined ? project.investorShare : (state.settings.investorShare || 0.3);
             
             return `
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -1059,35 +1071,44 @@
                         </div>
 
                         <div class="card p-6">
-                            <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                <i data-lucide="file-text" class="w-5 h-5 text-blue-500"></i>
-                                تفاصيل التعاقد
+                            <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm">
+                                <i data-lucide="info" class="w-4 h-4 text-indigo-500"></i>
+                                بيانات التعاقد والمشروع
                             </h4>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                <div class="bg-slate-50 p-3 rounded border border-slate-100">
+                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div class="bg-indigo-50/30 p-3 rounded-xl border border-indigo-100/50">
                                     <p class="text-[10px] text-gray-400 font-bold mb-1">العميل / الجهة</p>
-                                    <p class="text-sm font-bold text-slate-700">${project.clientName || '--'}</p>
+                                    <p class="text-xs font-bold text-slate-700 truncate" title="${project.clientName || '--'}">${project.clientName || '--'}</p>
                                 </div>
-                                <div class="bg-slate-50 p-3 rounded border border-slate-100">
+                                <div class="bg-indigo-50/30 p-3 rounded-xl border border-indigo-100/50">
                                     <p class="text-[10px] text-gray-400 font-bold mb-1">رقم العقد</p>
-                                    <p class="text-sm font-bold text-slate-700">${project.contractNumber || '--'}</p>
+                                    <p class="text-xs font-bold text-slate-700 font-mono">${project.contractNumber || '--'}</p>
                                 </div>
-                                <div class="bg-slate-50 p-3 rounded border border-slate-100">
+                                <div class="bg-indigo-50/30 p-3 rounded-xl border border-indigo-100/50">
                                     <p class="text-[10px] text-gray-400 font-bold mb-1">قيمة العقد</p>
-                                    <p class="text-sm font-bold text-blue-600">${formatMoney(project.contractValue || 0)}</p>
+                                    <p class="text-xs font-bold text-blue-600">${formatMoney(project.contractValue || 0, pid)}</p>
+                                </div>
+                                <div class="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100/50">
+                                    <p class="text-[10px] text-emerald-600 font-bold mb-1">الممول / الشريك</p>
+                                    <p class="text-xs font-bold text-emerald-800">${project.investorName || 'ممول عام'} (${((project.investorShare !== undefined ? project.investorShare : 0.3) * 100).toFixed(0)}%)</p>
                                 </div>
                             </div>
-                            
+                        </div>
+
+                        <div class="card p-6">
+                            <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <i data-lucide="file-text" class="w-5 h-5 text-blue-500"></i>
+                                معدل الإنجاز المالي (مقارنة بالميزانية)
+                            </h4>
                             <div class="flex justify-between items-center mb-4">
-                                <h4 class="font-bold text-slate-800 text-xs">معدل الإنجاز المالي (مقارنة بالميزانية)</h4>
-                                <span class="text-[10px] font-bold text-blue-600">${formatMoney(project.budget)} (ميزانية المصروفات)</span>
+                                <span class="text-[10px] font-bold text-blue-600">${formatMoney(project.budget, pid)} (ميزانية المصروفات المتوقعة)</span>
+                                <span class="text-[10px] font-bold text-gray-500">منصرف: ${formatMoney(stats.totalOut, pid)}</span>
                             </div>
                             <div class="w-full bg-slate-100 h-4 rounded-full overflow-hidden mb-2">
                                 <div class="bg-blue-600 h-full rounded-full transition-all duration-1000" style="width: ${progressPercent}%"></div>
                             </div>
                             <div class="flex justify-between text-[10px] font-bold text-gray-400">
-                                <span>تم إنفاق: ${formatMoney(stats.totalOut)}</span>
-                                <span>نسبة الإنفاق: %${progressPercent.toFixed(1)}</span>
+                                <span>نسبة الإنفاق الحالية: %${progressPercent.toFixed(1)}</span>
                             </div>
                         </div>
 
@@ -1121,11 +1142,11 @@
                         </div>
                         <div class="card-body p-4 space-y-4">
                             <div class="p-4 bg-blue-50 rounded-xl border border-blue-100">
-                                <span class="text-[10px] font-bold text-blue-800 opacity-60 block mb-1">نصيب الشركة (70%)</span>
+                                <span class="text-[10px] font-bold text-blue-800 opacity-60 block mb-1">نصيب الشركة (%${((1 - share) * 100).toFixed(0)})</span>
                                 <span class="text-xl font-black text-blue-900 font-mono">${formatMoney(stats.companyProfit, pid)}</span>
                             </div>
                             <div class="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
-                                <span class="text-[10px] font-bold text-emerald-800 opacity-60 block mb-1">نصيب الممول (30%)</span>
+                                <span class="text-[10px] font-bold text-emerald-800 opacity-60 block mb-1">نصيب ${project.investorName || 'الممول'} (%${(share * 100).toFixed(0)})</span>
                                 <span class="text-xl font-black text-emerald-900 font-mono">${formatMoney(stats.investorProfit, pid)}</span>
                             </div>
                         </div>
@@ -1180,7 +1201,14 @@
                                             <td class="text-green-600 font-bold">${t.type === 'in' ? formatMoney(t.amount, pid) : '--'}</td>
                                             <td class="text-red-600 font-bold">${t.type === 'out' ? formatMoney(t.amount, pid) : '--'}</td>
                                             <td class="no-print">
-                                                <button onclick="deleteTransaction('${t.id}', '${pid}')" class="text-red-300 hover:text-red-600 transition"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                                <div class="flex items-center gap-2 justify-end">
+                                                    <button onclick="openAddTransactionModal('${pid}', '${t.id}')" class="p-2 text-slate-400 hover:text-blue-600 transition bg-slate-50 rounded-lg hover:bg-blue-50" title="تعديل">
+                                                        <i data-lucide="edit-3" class="w-4 h-4"></i>
+                                                    </button>
+                                                    <button onclick="deleteTransaction('${t.id}', '${pid}')" class="p-2 text-slate-400 hover:text-red-600 transition bg-slate-50 rounded-lg hover:bg-red-50" title="حذف">
+                                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     `).join('')}
@@ -1248,6 +1276,34 @@
             `;
         };
 
+        window.deleteExtract = (id) => {
+            if (!state || !state.currentUser) return;
+            if (state.currentUser.role === 'partner') {
+                showToast('لا تملك صلاحية الحذف', 'error');
+                return;
+            }
+            if (confirm('هل أنت متأكد من حذف هذا المستخلص؟')) {
+                try {
+                    const initialLength = state.extracts.length;
+                    state.extracts = state.extracts.filter(e => e.id !== id);
+                    if (state.extracts.length < initialLength) {
+                        saveToLocalStorage();
+                        showToast('تم حذف المستخلص');
+                        if (currentSection === 'extracts') {
+                            renderExtracts(document.getElementById('content-area'));
+                        } else if (currentSection === 'project') {
+                            renderProjectView(document.getElementById('content-area'), currentProjectId);
+                        } else {
+                            showSection(currentSection);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Delete extract error:', e);
+                    showToast('حدث خطأ أثناء الحذف', 'error');
+                }
+            }
+        };
+
         const renderPayroll = (container) => {
             const currentMonth = document.getElementById('payroll-month')?.value || new Date().getMonth() + 1;
             
@@ -1298,24 +1354,24 @@
                                         <div class="flex-1">
                                             <div class="grid grid-cols-10 sm:grid-cols-15 gap-1 mb-2">
                                                 ${mData.attendance.map((present, i) => `
-                                                    <div class="flex flex-col items-center p-1 border ${present ? 'border-blue-100 bg-blue-50/30' : 'border-gray-100'} rounded">
-                                                        <span class="text-[9px] text-gray-400">${i+1}</span>
-                                                        <input type="checkbox" class="w-3 h-3 rounded text-blue-600 border-gray-300" ${present ? 'checked' : ''} 
+                                                    <div class="flex flex-col items-center p-1 border ${present ? 'border-blue-400 bg-blue-100 ring-1 ring-blue-50' : 'border-gray-200 bg-gray-50 opacity-40'} rounded transition-all">
+                                                        <span class="text-[9px] font-bold ${present ? 'text-blue-800' : 'text-gray-400'}">${i+1}</span>
+                                                        <input type="checkbox" class="w-3.5 h-3.5 rounded text-blue-600 border-gray-300 cursor-pointer" ${present ? 'checked' : ''} 
                                                                onchange="updateAttendance('${emp.id}', ${currentMonth}, ${i}, this.checked)">
                                                     </div>
                                                 `).join('')}
                                             </div>
                                         </div>
                                         <div class="lg:w-72 grid grid-cols-2 gap-2">
-                                            <div class="p-2 border rounded bg-slate-50">
+                                            <div class="p-2 border rounded bg-slate-50 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
                                                 <label class="block text-[9px] font-bold text-gray-400">ساعات إضافي</label>
-                                                <input type="number" value="${mData.overtime || 0}" class="w-full bg-transparent border-none p-0 text-xs font-bold focus:ring-0" 
-                                                       onchange="updatePayrollField('${emp.id}', ${currentMonth}, 'overtime', this.value)">
+                                                <input type="number" min="0" step="0.5" value="${mData.overtime || 0}" class="w-full bg-transparent border-none p-0 text-xs font-bold focus:ring-0" 
+                                                       onchange="const v = Math.max(0, parseFloat(this.value) || 0); this.value = v; updatePayrollField('${emp.id}', ${currentMonth}, 'overtime', v)">
                                             </div>
-                                            <div class="p-2 border rounded bg-slate-50">
+                                            <div class="p-2 border rounded bg-slate-50 focus-within:ring-2 focus-within:ring-red-100 transition-all">
                                                 <label class="block text-[9px] font-bold text-gray-400">سلف/خصم</label>
-                                                <input type="number" value="${mData.advance || 0}" class="w-full bg-transparent border-none p-0 text-xs font-bold text-red-600 focus:ring-0" 
-                                                       onchange="updatePayrollField('${emp.id}', ${currentMonth}, 'advance', this.value)">
+                                                <input type="number" min="0" value="${mData.advance || 0}" class="w-full bg-transparent border-none p-0 text-xs font-bold text-red-600 focus:ring-0" 
+                                                       onchange="const v = Math.max(0, parseFloat(this.value) || 0); this.value = v; updatePayrollField('${emp.id}', ${currentMonth}, 'advance', v)">
                                             </div>
                                             <div class="col-span-2 p-2 bg-blue-600 text-white rounded">
                                                 <div class="flex justify-between items-center mb-1">
@@ -1336,7 +1392,7 @@
             lucide.createIcons();
         };
 
-        const updateAttendance = (empId, month, dayIdx, value) => {
+        window.updateAttendance = (empId, month, dayIdx, value) => {
             if (!state.payroll[month]) state.payroll[month] = {};
             if (!state.payroll[month][empId]) state.payroll[month][empId] = { attendance: Array(30).fill(1), overtime: 0, bonus: 0, advance: 0 };
             
@@ -1348,7 +1404,7 @@
             document.getElementById(`salary-${empId}`).innerText = formatMoney(newSalary);
         };
 
-        const updatePayrollField = (empId, month, field, value) => {
+        window.updatePayrollField = (empId, month, field, value) => {
             if (!state.payroll[month]) state.payroll[month] = {};
             if (!state.payroll[month][empId]) state.payroll[month][empId] = { attendance: Array(30).fill(1), overtime: 0, bonus: 0, advance: 0 };
             
@@ -1836,7 +1892,69 @@
             lucide.createIcons();
         };
 
+        window.handleExtractsExcelImport = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                if (jsonData.length === 0) {
+                    showToast("الملف فارغ!");
+                    return;
+                }
+
+                // Map Excel headers to extract fields
+                // Expected headers: 'التاريخ', 'الرقم', 'المشروع', 'المبلغ', 'الحالة'
+                let importedCount = 0;
+                jsonData.forEach(row => {
+                    const project = state.projects.find(p => p.name === row['المشروع'] || p.id === row['المشروع']);
+                    if (project) {
+                    const amount = parseFloat(row['المبلغ']) || 0;
+                    const tax = amount * (state.settings.taxRate / 100);
+                    const net = amount - tax;
+                    
+                    state.extracts.push({
+                        id: 'ex' + Date.now() + Math.floor(Math.random() * 1000),
+                        projectId: project.id,
+                        number: row['الرقم'] || ('EXT-' + (state.extracts.length + 1)),
+                        date: row['التاريخ'] || new Date().toISOString().split('T')[0],
+                        amount: amount,
+                        tax: tax,
+                        net: net,
+                        status: row['الحالة'] === 'محصل' ? 'received' : 'pending'
+                    });
+                    importedCount++;
+                    }
+                });
+
+                if (importedCount > 0) {
+                    saveToLocalStorage();
+                    renderExtracts(document.getElementById('content-area'));
+                    showToast(`تم استيراد ${importedCount} مستخلص بنجاح`);
+                } else {
+                    showToast("لم يتم العثور على مشاريع متطابقة في الملف", "error");
+                }
+                } catch (err) {
+                console.error(err);
+                showToast("خطأ في معالجة الملف", "error");
+                }
+                event.target.value = ''; // Reset input
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
         const renderExtracts = (container) => {
+            const totalAmount = state.extracts.reduce((sum, e) => sum + e.amount, 0);
+            const totalTax = totalAmount * (state.settings.taxRate / 100);
+            const netReceived = state.extracts.filter(e => e.status === 'received').reduce((sum, e) => sum + e.net, 0);
+
             const filteredExtracts = currentExtractsFilter === 'pending' 
                 ? state.extracts.filter(e => e.status !== 'received')
                 : state.extracts;
@@ -1845,15 +1963,15 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div class="stat-card income">
                         <p class="stat-label">إجمالي المستخلصات</p>
-                        <p class="stat-value">${formatMoney(state.extracts.reduce((sum, e) => sum + e.amount, 0))}</p>
+                        <p class="stat-value">${formatMoney(totalAmount)}</p>
                     </div>
                     <div class="stat-card expense">
                         <p class="stat-label">إجمالي الضرائب (${state.settings.taxRate}%)</p>
-                        <p class="stat-value text-red-600">${formatMoney(state.extracts.reduce((sum, e) => sum + e.tax, 0))}</p>
+                        <p class="stat-value text-red-600">${formatMoney(totalTax)}</p>
                     </div>
                     <div class="stat-card profit">
                         <p class="stat-label">صافي المحصل</p>
-                        <p class="stat-value text-green-600">${formatMoney(state.extracts.filter(e => e.status === 'received').reduce((sum, e) => sum + e.net, 0))}</p>
+                        <p class="stat-value text-green-600">${formatMoney(netReceived)}</p>
                     </div>
                 </div>
                 
@@ -1867,7 +1985,14 @@
                                 <option value="pending" ${currentExtractsFilter === 'pending' ? 'selected' : ''}>المعلقة فقط</option>
                             </select>
                         </div>
-                        <button onclick="openAddExtractModal()" class="btn-primary !p-2 text-xs">إضافة مستخلص</button>
+                        <div class="flex items-center gap-2">
+                            <input type="file" id="extracts-excel-input" class="hidden" accept=".xlsx, .xls" onchange="handleExtractsExcelImport(event)">
+                            <button onclick="document.getElementById('extracts-excel-input').click()" class="flex items-center gap-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 p-2 rounded-lg text-xs font-bold transition border border-emerald-200">
+                                <i data-lucide="file-up" class="w-3.5 h-3.5"></i>
+                                استيراد اكسيل
+                            </button>
+                            <button onclick="openAddExtractModal()" class="btn-primary !p-2 text-xs">إضافة مستخلص</button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <table class="data-table">
@@ -1881,6 +2006,7 @@
                                     <th>الصافي</th>
                                     <th>الأيام المعلقة</th>
                                     <th>الحالة</th>
+                                    <th class="no-print">إجراءات</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1901,10 +2027,17 @@
                                                     ${e.status === 'received' ? 'مستلم' : 'معلق'}
                                                 </span>
                                             </td>
+                                            <td class="no-print">
+                                                <div class="flex items-center gap-2">
+                                                    <button onclick="deleteExtract('${e.id}')" class="p-1.5 text-gray-400 hover:text-red-600 transition" title="حذف">
+                                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
                                         </tr>
                                     `;
                                 }).join('')}
-                                ${filteredExtracts.length === 0 ? '<tr><td colspan="8" class="text-center py-4 text-gray-400 italic">لا توجد مستخلصات</td></tr>' : ''}
+                                ${filteredExtracts.length === 0 ? '<tr><td colspan="9" class="text-center py-4 text-gray-400 italic">لا توجد مستخلصات</td></tr>' : ''}
                             </tbody>
                         </table>
                     </div>
@@ -2225,7 +2358,7 @@
         };
 
         // --- Modals ---
-        const openAddProjectModal = () => {
+        window.openAddProjectModal = () => {
             const html = `
                 <div class="p-6">
                     <div class="flex items-center gap-3 mb-6">
@@ -2258,6 +2391,14 @@
                             <div>
                                 <label class="block text-sm font-semibold mb-1 text-slate-700">الميزانية التقديرية (مصروفات)</label>
                                 <input type="number" id="p-budget" required class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-100 outline-none transition">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1 text-slate-700">اسم الممول / الشريك</label>
+                                <input type="text" id="p-investor-name" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-100 outline-none transition" placeholder="مثال: م/ محمود">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold mb-1 text-slate-700">نسبة الممول (%)</label>
+                                <input type="number" id="p-investor-share" step="0.01" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-100 outline-none transition" value="${(state.settings.investorShare * 100) || 30}">
                             </div>
                         </div>
                         <div>
@@ -2294,7 +2435,7 @@
             openModal(html);
         };
 
-        const saveProject = (e) => {
+        window.saveProject = (e) => {
             e.preventDefault();
             const name = document.getElementById('p-name').value;
             const description = document.getElementById('p-desc').value;
@@ -2305,6 +2446,8 @@
             const contractNumber = document.getElementById('p-contract-num').value;
             const contractValue = parseFloat(document.getElementById('p-contract-val').value);
             const budget = parseFloat(document.getElementById('p-budget').value);
+            const investorName = document.getElementById('p-investor-name').value;
+            const investorShare = parseFloat(document.getElementById('p-investor-share').value) / 100;
 
             const newProject = {
                 id: 'p' + Date.now(),
@@ -2317,6 +2460,8 @@
                 contractNumber,
                 contractValue,
                 budget,
+                investorName,
+                investorShare,
                 status: 'active'
             };
 
@@ -2328,28 +2473,30 @@
             showToast('تم إنشاء المشروع الجديد بنجاح');
         };
 
-        const openAddTransactionModal = (pid) => {
+        window.openAddTransactionModal = (pid, tid = null) => {
             const user = state.currentUser;
             if (user.role === 'partner') {
                 showToast('الشركاء لا يملكون صلاحية إضافة معاملات', 'error');
                 return;
             }
-            
+
             const project = state.projects.find(p => p.id === pid);
+            const tx = tid ? state.transactions.find(t => t.id === tid) : null;
+            
             const html = `
                 <div class="p-6">
-                    <h3 class="text-xl font-bold mb-4">إضافة حركة جديدة - ${project.name}</h3>
-                    <form id="tx-form" onsubmit="saveTransaction(event, '${pid}')" class="space-y-4">
+                    <h3 class="text-xl font-bold mb-4">${tid ? 'تعديل حركة' : 'إضافة حركة جديدة'} - ${project.name}</h3>
+                    <form id="tx-form" onsubmit="saveTransaction(event, '${pid}', ${tid ? `'${tid}'` : 'null'})" class="space-y-4">
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-semibold mb-1">التاريخ</label>
-                                <input type="date" id="tx-date" required class="w-full p-2 border rounded" value="${new Date().toISOString().split('T')[0]}">
+                                <input type="date" id="tx-date" required class="w-full p-2 border rounded" value="${tx ? tx.date : new Date().toISOString().split('T')[0]}">
                             </div>
                             <div>
                                 <label class="block text-sm font-semibold mb-1">النوع</label>
-                                <select id="tx-type" required class="w-full p-2 border rounded" ${user.role === 'engineer' ? 'disabled' : ''}>
-                                    <option value="out" ${user.role === 'engineer' ? 'selected' : ''}>صادر (مصروفات)</option>
-                                    ${user.role !== 'engineer' ? '<option value="in">وارد (إيرادات)</option>' : ''}
+                                <select id="tx-type" required class="w-full p-2 border rounded" ${(user.role === 'engineer' && !tid) ? 'disabled' : ''}>
+                                    <option value="out" ${(tx ? tx.type === 'out' : user.role === 'engineer') ? 'selected' : ''}>صادر (مصروفات)</option>
+                                    ${(user.role !== 'engineer' || (tx && tx.type === 'in')) ? `<option value="in" ${tx && tx.type === 'in' ? 'selected' : ''}>وارد (إيرادات)</option>` : ''}
                                 </select>
                             </div>
                         </div>
@@ -2358,56 +2505,55 @@
                                 <label class="block text-sm font-semibold mb-1">الفئة</label>
                                 <select id="tx-category" required class="w-full p-2 border rounded">
                                     ${user.role === 'engineer' ? `
-                                        <option>مواد خام</option>
-                                        <option>عمالة</option>
-                                        <option>مواصلات</option>
-                                        <option>سلف</option>
-                                        <option>أخرى</option>
+                                        <option ${tx && tx.category === 'مواد خام' ? 'selected' : ''}>مواد خام</option>
+                                        <option ${tx && tx.category === 'عمالة' ? 'selected' : ''}>عمالة</option>
+                                        <option ${tx && tx.category === 'مواصلات' ? 'selected' : ''}>مواصلات</option>
+                                        <option ${tx && tx.category === 'سلف' ? 'selected' : ''}>سلف</option>
+                                        <option ${tx && tx.category === 'أخرى' ? 'selected' : ''}>أخرى</option>
                                     ` : `
-                                        <option>مواد خام</option>
-                                        <option>عمالة</option>
-                                        <option>مواصلات</option>
-                                        <option>ضرائب</option>
-                                        <option>وارد مستخلص</option>
-                                        <option>سلف</option>
-                                        <option>أخرى</option>
+                                        <option ${tx && tx.category === 'مواد خام' ? 'selected' : ''}>مواد خام</option>
+                                        <option ${tx && tx.category === 'عمالة' ? 'selected' : ''}>عمالة</option>
+                                        <option ${tx && tx.category === 'مواصلات' ? 'selected' : ''}>مواصلات</option>
+                                        <option ${tx && tx.category === 'ضرائب' ? 'selected' : ''}>ضرائب</option>
+                                        <option ${tx && tx.category === 'وارد مستخلص' ? 'selected' : ''}>وارد مستخلص</option>
+                                        <option ${tx && tx.category === 'سلف' ? 'selected' : ''}>سلف</option>
+                                        <option ${tx && tx.category === 'أخرى' ? 'selected' : ''}>أخرى</option>
                                     `}
                                 </select>
                             </div>
                             <div>
                                 <label class="block text-sm font-semibold mb-1">طريقة الدفع / التحصيل</label>
-                                <select id="tx-method" required class="w-full p-2 border rounded bg-slate-50 font-bold" ${user.role === 'engineer' ? 'disabled' : ''}>
-                                    <option value="cash" selected>كاش (نقدي)</option>
-                                    ${user.role !== 'engineer' ? `
-                                        <option value="bank">تحويل بنكي</option>
-                                        <option value="cc">بطاقة ائتمان (فيزا)</option>
+                                <select id="tx-method" required class="w-full p-2 border rounded bg-slate-50 font-bold" ${(user.role === 'engineer' && !tid) ? 'disabled' : ''}>
+                                    <option value="cash" ${tx && tx.method === 'cash' ? 'selected' : ''}>كاش (نقدي)</option>
+                                    ${(user.role !== 'engineer' || (tx && tx.method !== 'cash')) ? `
+                                        <option value="bank" ${tx && tx.method === 'bank' ? 'selected' : ''}>تحويل بنكي</option>
+                                        <option value="cc" ${tx && tx.method === 'cc' ? 'selected' : ''}>بطاقة ائتمان (فيزا)</option>
                                     ` : ''}
                                 </select>
                             </div>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">المبلغ (${project.currency || state.settings.defaultCurrency || 'ج.م'})</label>
-                            <input type="number" id="tx-amount" required step="0.01" class="w-full p-2 border rounded font-bold text-lg text-blue-600">
+                            <input type="number" id="tx-amount" required step="0.01" class="w-full p-2 border rounded font-bold text-lg text-blue-600" value="${tx ? tx.amount : ''}">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-1">البيان / ملاحظات</label>
-                            <textarea id="tx-desc" rows="3" class="w-full p-2 border rounded" placeholder="مثال: فاتورة توريد مواسير شهر مايو..."></textarea>
+                            <textarea id="tx-desc" rows="3" class="w-full p-2 border rounded" placeholder="مثال: فاتورة توريد مواسير شهر مايو...">${tx ? tx.desc : ''}</textarea>
                         </div>
                         <div class="flex justify-end space-x-2 space-x-reverse pt-4">
                             <button type="button" onclick="closeModal()" class="px-4 py-2 text-gray-500 hover:text-gray-700">إلغاء</button>
-                            <button type="submit" class="btn-primary">حفظ العملية</button>
+                            <button type="submit" class="btn-primary">${tid ? 'تحديث العملية' : 'حفظ العملية'}</button>
                         </div>
                     </form>
                 </div>
             `;
             openModal(html);
+            if (window.lucide) window.lucide.createIcons();
         };
 
-        const saveTransaction = (e, pid) => {
+        window.saveTransaction = (e, pid, tid = null) => {
             e.preventDefault();
-            const newTx = {
-                id: 't' + Date.now(),
-                projectId: pid,
+            const txData = {
                 date: document.getElementById('tx-date').value,
                 type: document.getElementById('tx-type').value,
                 category: document.getElementById('tx-category').value,
@@ -2415,27 +2561,76 @@
                 amount: parseFloat(document.getElementById('tx-amount').value),
                 desc: document.getElementById('tx-desc').value
             };
-            state.transactions.push(newTx);
+
+            if (tid) {
+                const index = state.transactions.findIndex(t => t.id === tid);
+                if (index !== -1) {
+                    state.transactions[index] = { ...state.transactions[index], ...txData };
+                    showToast('تم تحديث العملية بنجاح');
+                }
+            } else {
+                const newTx = {
+                    id: 't' + Date.now(),
+                    projectId: pid,
+                    ...txData
+                };
+                state.transactions.push(newTx);
+                showToast('تم حفظ العملية بنجاح');
+            }
+
             saveToLocalStorage();
             closeModal();
-            showToast('تم حفظ العملية بنجاح');
             renderProjectView(document.getElementById('content-area'), pid);
             renderSidebarProjects();
             checkProjectAlerts(true);
         };
 
-        const deleteTransaction = (tid, pid) => {
-            const role = state.currentUser.role;
-            if (role === 'partner' || role === 'engineer') {
-                showToast('لا تملك صلاحية حذف المعاملات', 'error');
+        window.deleteTransaction = (tid, pid) => {
+            console.log('Delete Transaction called:', { tid, pid, currentSection });
+            
+            if (!state || !state.currentUser) {
+                console.error('State or currentUser not found');
                 return;
             }
-            if (confirm('هل أنت متأكد من رغبتك في حذف هذه العملية؟')) {
-                state.transactions = state.transactions.filter(t => t.id !== tid);
-                saveToLocalStorage();
-                showToast('تم حذف العملية');
-                renderProjectView(document.getElementById('content-area'), pid);
-                checkProjectAlerts(true);
+            
+            const user = state.currentUser;
+            if (user.role === 'partner') {
+                showToast('عذراً، لا يملك الشركاء صلاحية حذف المعاملات المالية', 'error');
+                return;
+            }
+
+            if (window.confirm('هل أنت متأكد من رغبتك في حذف هذه المعاملة؟')) {
+                try {
+                    const initialLength = state.transactions.length;
+                    state.transactions = state.transactions.filter(t => t.id !== tid);
+                    
+                    if (state.transactions.length < initialLength) {
+                        saveToLocalStorage();
+                        showToast('تم حذف المعاملة بنجاح');
+                        
+                        // Force UI Refresh
+                        if (currentSection === 'dashboard') {
+                            renderDashboard(document.getElementById('content-area'));
+                        } else {
+                            // If in project view or other, refresh current view
+                            const activePid = pid || currentProjectId || (state.projects[0] ? state.projects[0].id : null);
+                            if (activePid) {
+                                renderProjectView(document.getElementById('content-area'), activePid);
+                            } else {
+                                showSection(currentSection);
+                            }
+                        }
+                        
+                        if (typeof renderSidebarProjects === 'function') renderSidebarProjects();
+                        if (typeof checkProjectAlerts === 'function') checkProjectAlerts(true);
+                    } else {
+                        console.warn('Transaction with ID not found:', tid);
+                        showToast('فشل الحذف: المعاملة غير موجودة (قد تكون حُذفت بالفعل)', 'error');
+                    }
+                } catch (e) {
+                    console.error('Delete transaction error:', e);
+                    showToast('حدث خطأ أثناء محاولة الحذف: ' + e.message, 'error');
+                }
             }
         };
 
@@ -2632,7 +2827,7 @@
             }
         };
 
-        const openAddExtractModal = () => {
+        window.openAddExtractModal = () => {
             const html = `
                 <div class="p-6">
                     <h3 class="text-xl font-bold mb-4">إضافة مستخلص جديد</h3>
@@ -2667,7 +2862,7 @@
             openModal(html);
         };
 
-        const saveExtract = (e) => {
+        window.saveExtract = (e) => {
             e.preventDefault();
             const amount = parseFloat(document.getElementById('e-amount').value);
             const tax = amount * (state.settings.taxRate / 100);
@@ -2906,8 +3101,9 @@
             const ccBalance = txs.filter(t => t.method === 'cc').reduce((sum, t) => sum + (t.type === 'in' ? t.amount : -t.amount), 0);
 
             // Partner Distribution
-            const investorProfit = Math.max(0, net * (state.settings.investorShare || 0.3));
-            const companyProfit = Math.max(0, net * (state.settings.companyShare || 0.7));
+            const share = project?.investorShare !== undefined ? project.investorShare : (state.settings.investorShare || 0.3);
+            const investorProfit = Math.max(0, net * share);
+            const companyProfit = Math.max(0, net * (1 - share));
 
             // Progress vs Contract
             const contractValue = project?.contractValue || 0;
@@ -2964,13 +3160,28 @@
             return total;
         };
 
-        const handleGlobalSearch = (query) => {
+        window.handleGlobalSearch = (query) => {
             if (!query || query.length < 2) return;
+            const q = query.toLowerCase();
             
             const results = {
-                projects: state.projects.filter(p => (p.name.includes(query) || (p.description && p.description.includes(query))) && canAccess('project', p.id)),
-                transactions: state.transactions.filter(t => ((t.desc && t.desc.includes(query)) || t.category.includes(query)) && canAccess('project', t.projectId)).slice(0, 10),
-                employees: state.employees.filter(e => (e.name.includes(query) || e.job.includes(query)) && canAccess('payroll'))
+                projects: state.projects.filter(p => (
+                    p.name.toLowerCase().includes(q) || 
+                    (p.description && p.description.toLowerCase().includes(q))
+                ) && canAccess('project', p.id)),
+                transactions: state.transactions.filter(t => {
+                    const p = state.projects.find(pj => pj.id === t.projectId);
+                    const projectName = p ? p.name.toLowerCase() : '';
+                    return (
+                        (t.desc && t.desc.toLowerCase().includes(q)) || 
+                        t.category.toLowerCase().includes(q) || 
+                        projectName.includes(q)
+                    ) && canAccess('project', t.projectId);
+                }).slice(0, 15),
+                employees: state.employees.filter(e => (
+                    e.name.toLowerCase().includes(q) || 
+                    e.job.toLowerCase().includes(q)
+                ) && canAccess('payroll'))
             };
             
             showSearchResults(results);
@@ -2991,7 +3202,7 @@
                                 <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">المشاريع</h4>
                                 <div class="grid grid-cols-1 gap-2">
                                     ${results.projects.map(p => `
-                                        <button onclick="showSection('project', '${p.id}')" class="flex items-center justify-between p-3 bg-slate-50 hover:bg-blue-50 rounded-lg transition border border-transparent hover:border-blue-200">
+                                        <button onclick="closeModal(); showSection('project', '${p.id}')" class="flex items-center justify-between p-3 bg-slate-50 hover:bg-blue-50 rounded-lg transition border border-transparent hover:border-blue-200 w-full text-right">
                                             <span class="text-sm font-bold text-slate-700">${p.name}</span>
                                             <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">${p.type}</span>
                                         </button>
@@ -3002,21 +3213,21 @@
                         
                         ${results.transactions.length ? `
                             <div>
-                                <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">آخر المعاملات المتطابقة</h4>
+                                <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">المعاملات المالية</h4>
                                 <div class="space-y-2">
                                     ${results.transactions.map(t => {
                                         const p = state.projects.find(pj => pj.id === t.projectId);
                                         return `
-                                            <div class="flex items-center justify-between p-3 border rounded-lg bg-white">
+                                            <button onclick="closeModal(); showSection('project', '${t.projectId}')" class="flex items-center justify-between p-3 border rounded-lg bg-white hover:bg-slate-50 transition w-full text-right group">
                                                 <div>
-                                                    <p class="text-sm font-bold text-slate-700">${t.desc || t.category}</p>
-                                                    <p class="text-[10px] text-gray-400">${p ? p.name : ''} | ${formatDate(t.date)}</p>
+                                                    <p class="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition">${t.desc || t.category}</p>
+                                                    <p class="text-[10px] text-gray-400">${p ? p.name : 'مشروع غير معروف'} | ${formatDate(t.date)}</p>
                                                 </div>
                                                 <div class="text-left">
                                                     <p class="text-sm font-black ${t.type === 'in' ? 'text-green-600' : 'text-red-600'}">${formatMoney(t.amount, t.projectId)}</p>
-                                                    <span class="text-[9px] uppercase font-bold">${t.method}</span>
+                                                    <span class="text-[9px] uppercase font-bold text-gray-400">${t.method}</span>
                                                 </div>
-                                            </div>
+                                            </button>
                                         `;
                                     }).join('')}
                                 </div>
@@ -3025,16 +3236,16 @@
 
                         ${results.employees.length ? `
                             <div>
-                                <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">الموظفين</h4>
+                                <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">الموظفين والطاقم</h4>
                                 <div class="grid grid-cols-1 gap-2">
                                     ${results.employees.map(e => `
-                                        <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                                            <div class="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">${e.name[0]}</div>
+                                        <button onclick="closeModal(); showSection('payroll')" class="flex items-center gap-3 p-3 bg-slate-50 hover:bg-blue-50 rounded-lg transition w-full text-right group">
+                                            <div class="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs group-hover:bg-blue-600 group-hover:text-white transition">${e.name[0]}</div>
                                             <div>
                                                 <p class="text-sm font-bold text-slate-700">${e.name}</p>
                                                 <p class="text-[10px] text-gray-400">${e.job} | ${e.site}</p>
                                             </div>
-                                        </div>
+                                        </button>
                                     `).join('')}
                                 </div>
                             </div>
@@ -3045,6 +3256,7 @@
                 </div>
             `;
             openModal(html);
+            if (window.lucide) window.lucide.createIcons();
         };
 
         // --- Charts Initialization ---
@@ -3232,11 +3444,11 @@
                 const isActive = currentProjectId === p.id && currentSection === 'project';
                 return `
                     <a href="#" onclick="showSection('project', '${p.id}')" data-section="project" data-id="${p.id}" 
-                       class="nav-item !py-2.5 !px-5 !gap-3 ${isActive ? 'active' : ''}" title="${p.description || p.name}">
+                       class="nav-item !py-2.5 !px-5 !gap-3 ${isActive ? 'active' : ''}" title="${p.description ? 'وصف المشروع: ' + p.description : p.name}">
                         <div class="flex items-center">
                             <i data-lucide="${p.icon || 'building-2'}" class="w-4 h-4 ${stats.hasDeficit ? 'text-red-500' : 'text-blue-400'}"></i>
                         </div>
-                        <span class="flex-1 truncate text-[0.85rem] font-medium transition-colors">${p.name}</span>
+                        <span class="flex-1 truncate text-[0.85rem] font-medium transition-colors" title="${p.name}">${p.name}</span>
                         ${stats.hasDeficit ? '<i data-lucide="alert-circle" class="w-3 h-3 text-red-400"></i>' : ''}
                     </a>
                 `;
@@ -3253,7 +3465,7 @@
             document.getElementById(`excel-import-input-${pid}`).click();
         };
 
-        const handleExcelImport = (e, pid) => {
+        window.handleExcelImport = (e, pid) => {
             const file = e.target.files[0];
             if (!file) return;
 
